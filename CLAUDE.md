@@ -1,0 +1,15 @@
+@docs/codebase-summary.md
+- **Name:** cabinet-layout
+- **Description:** Browser-based 2D electrical cabinet layout tool — drag, arrange, and annotate DIN-rail components on a zoomable SVG canvas, then export as SVG/PNG/JPG
+- **Status:** Active development
+- **Key features:**
+  - Drag-and-drop component palette onto an infinite SVG canvas
+  - Wireduct drawing (horizontal/vertical), rectangle annotation, free text labels
+  - Per-instance part-number toggle (right-click context menu)
+  - Rubber-band multi-select; move/rotate selected items
+  - Undo history; snap-to-grid
+  - CSV import (replace or append mode) with preview dialog
+  - Export image: SVG, PNG, JPG (grid excluded, auto-zoom-to-fit content)
+  - Zoom 10–10 000 %; pan via middle-mouse or Space+drag
+  - Text scale and line thickness sliders (0–10×, zoom-independent)
+  - Palette CRUD: add, edit dimensions/qty, delete with confirm
