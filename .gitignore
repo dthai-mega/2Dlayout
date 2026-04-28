@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.js.map
+# Prevent tsc from accidentally emitting JS alongside TS source
+src/**/*.js
+repomix-output.xml
+Clauderun - Skip.bat
+Clauderun.bat
+cmdrun.bat
+npmrun.bat
+Mockup.csv
+mockup.json
