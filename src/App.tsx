@@ -461,6 +461,15 @@ export default function App() {
     } catch { /* user cancelled */ }
   }, []);
 
+  const handleDownloadCsvTemplate = useCallback(() => {
+    const csv = 'ID,PN,MANUFACTURER,MANUFACTURER PART #,DESCRIPTION,QTY,W,H,D\n';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'template.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
   const buildExportSvgClone = useCallback(() => {
     const svg = canvasRef.current?.getSvgElement();
     if (!svg) return null;
@@ -854,6 +863,7 @@ export default function App() {
         lineScale={lineScale}
         onLineScaleChange={setLineScale}
         onLoadCsv={handleLoadCsv}
+        onDownloadCsvTemplate={handleDownloadCsvTemplate}
         onExport={handleExport}
         onSaveJson={handleSaveJson}
         onLoadJson={handleLoadJson}

@@ -16,7 +16,7 @@ const DELIMITERS: { label: string; value: string }[] = [
   { label: 'Semicolon', value: ';' },
 ];
 
-const COLUMNS = ['ID', 'Part Number', 'Width', 'Height', 'Depth', 'Qty'];
+const COLUMNS = ['ID', 'Part Number', 'Description', 'Width', 'Height', 'Depth', 'Qty'];
 
 function isRowValid(def: ComponentDef): boolean {
   return (
@@ -83,7 +83,7 @@ export default function CsvPreviewDialog({ rawText, existingIds, onConfirm, onCa
             <tbody>
               {defs.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#999' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', color: '#999' }}>
                     No data rows
                   </td>
                 </tr>
@@ -92,6 +92,7 @@ export default function CsvPreviewDialog({ rawText, existingIds, onConfirm, onCa
                 <tr key={i} className={isRowValid(def) ? '' : 'invalid'}>
                   <td>{def.id || '—'}</td>
                   <td>{def.partNumber || '—'}</td>
+                  <td>{def.description || '—'}</td>
                   <td>{isNaN(def.width) ? '?' : def.width}</td>
                   <td>{isNaN(def.height) ? '?' : def.height}</td>
                   <td>{isNaN(def.depth) ? '?' : def.depth}</td>

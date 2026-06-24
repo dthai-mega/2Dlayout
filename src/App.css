@@ -80,6 +80,15 @@ html, body, #root {
   font-size: 11px;
 }
 
+.palette-item-desc {
+  color: #777;
+  font-size: 10px;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .palette-item-qty {
   font-size: 11px;
   color: #888;

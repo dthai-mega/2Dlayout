@@ -1,6 +1,7 @@
 export interface ComponentDef {
   id: string;
   partNumber: string;
+  description?: string;
   width: number;   // mm → canvas px (1:1)
   height: number;  // mm → canvas px (1:1)
   depth: number;   // mm, stored only
