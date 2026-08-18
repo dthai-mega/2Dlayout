@@ -15,6 +15,11 @@ interface Props {
 export default function PlacedComponent({ item, def, selected, overlapping, textUnit, strokeUnit, onMouseDown, onClick, onContextMenu }: Props) {
   const stroke = overlapping ? '#e53e3e' : selected ? '#3182ce' : '#555';
   const strokeWidth = (selected || overlapping ? 2 : 1) * strokeUnit;
+  const tooltip = [
+    `PN: ${def.partNumber || '—'}`,
+    `Tag: ${item.tag || '—'}`,
+    `Description: ${def.description || '—'}`,
+  ].join('\n');
 
   return (
     <g
@@ -24,6 +29,7 @@ export default function PlacedComponent({ item, def, selected, overlapping, text
       onClick={e => onClick(e, item.instanceId)}
       onContextMenu={e => onContextMenu(e, item.instanceId)}
     >
+      <title>{tooltip}</title>
       <rect
         width={def.width}
         height={def.height}

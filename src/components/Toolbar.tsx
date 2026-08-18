@@ -157,13 +157,21 @@ export default function Toolbar({
         <input
           type="range"
           min={10}
-          max={5000}
+          max={300}
           step={5}
           value={Math.round(transform.scale * 100)}
           onChange={e => onZoomChange(Number(e.target.value) / 100)}
           style={{ width: 220 }}
         />
-        {Math.round(transform.scale * 100)}%
+        <input
+          type="number"
+          min={10}
+          value={Math.round(transform.scale * 100)}
+          onChange={e => onZoomChange(Number(e.target.value) / 100)}
+          onKeyDown={e => e.stopPropagation()}
+          style={{ width: 60 }}
+        />
+        %
       </label>
       <button onClick={onZoomAll}>Zoom All</button>
 
