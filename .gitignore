@@ -12,3 +12,4 @@ Mockup.csv
 mockup.json
 CSV Template new.csv
 .playwright-mcp/
+.vite/
