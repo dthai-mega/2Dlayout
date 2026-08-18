@@ -92,6 +92,7 @@ export default function App() {
 
   const panState = useRef<{ startX: number; startY: number; origOffsetX: number; origOffsetY: number } | null>(null);
   const lastMiddleClick = useRef<number>(0);
+  const lastEscapePress = useRef<number>(0);
 
   const [triggerZoomAll, setTriggerZoomAll] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ instanceId: string; x: number; y: number } | null>(null);
@@ -198,7 +199,15 @@ export default function App() {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         cancelActiveCommand();
-        if (tool === 'rotate') setTool('select');
+        if (tool !== 'select') {
+          const now = Date.now();
+          if (now - lastEscapePress.current < 400) {
+            setTool('select');
+            lastEscapePress.current = 0;
+          } else {
+            lastEscapePress.current = now;
+          }
+        }
         return;
       }
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
@@ -237,6 +246,7 @@ export default function App() {
       ));
       return;
     }
+    if (tool === 'wireduct' || tool === 'rect' || tool === 'text') handleToolChange('select');
     if (e.ctrlKey) {
       setSelectedIds(prev => {
         const next = new Set(prev);
@@ -246,10 +256,11 @@ export default function App() {
     } else {
       setSelectedIds(new Set([instanceId]));
     }
-  }, [tool, pushHistory]);
+  }, [tool, pushHistory, handleToolChange]);
 
   const handleWireductClick = useCallback((e: { stopPropagation: () => void; ctrlKey: boolean }, id: string) => {
     e.stopPropagation();
+    if (tool === 'wireduct' || tool === 'rect' || tool === 'text') handleToolChange('select');
     if (e.ctrlKey) {
       setSelectedIds(prev => {
         const next = new Set(prev);
@@ -259,10 +270,11 @@ export default function App() {
     } else {
       setSelectedIds(new Set([id]));
     }
-  }, []);
+  }, [tool, handleToolChange]);
 
   const handleRectClick = useCallback((e: { stopPropagation: () => void; ctrlKey: boolean }, id: string) => {
     e.stopPropagation();
+    if (tool === 'wireduct' || tool === 'rect' || tool === 'text') handleToolChange('select');
     if (e.ctrlKey) {
       setSelectedIds(prev => {
         const next = new Set(prev);
@@ -272,7 +284,7 @@ export default function App() {
     } else {
       setSelectedIds(new Set([id]));
     }
-  }, []);
+  }, [tool, handleToolChange]);
 
   const handleComponentContextMenu = useCallback((e: React.MouseEvent, instanceId: string) => {
     e.preventDefault();
@@ -314,6 +326,7 @@ export default function App() {
 
   const handleTextClick = useCallback((e: { stopPropagation: () => void; ctrlKey: boolean }, id: string) => {
     e.stopPropagation();
+    if (tool === 'wireduct' || tool === 'rect' || tool === 'text') handleToolChange('select');
     if (e.ctrlKey) {
       setSelectedIds(prev => {
         const next = new Set(prev);
@@ -323,7 +336,7 @@ export default function App() {
     } else {
       setSelectedIds(new Set([id]));
     }
-  }, []);
+  }, [tool, handleToolChange]);
 
   const handleTextConfirm = useCallback((text: string) => {
     if (!textInputState) return;
@@ -908,6 +921,7 @@ export default function App() {
         <Palette
           defs={componentDefs}
           placed={placed}
+          selectedIds={selectedIds}
           onDeleteDef={handleDeleteDef}
           onEditDef={handleEditDef}
           onAddDef={handleAddDef}

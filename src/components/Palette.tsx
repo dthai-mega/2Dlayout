@@ -7,6 +7,7 @@ import { unusedTags } from '../utils/tags';
 interface Props {
   defs: ComponentDef[];
   placed: PlacedComponent[];
+  selectedIds: Set<string>;
   onDeleteDef: (id: string) => void;
   onEditDef: (def: ComponentDef) => void;
   onAddDef: (def: ComponentDef) => void;
@@ -90,12 +91,16 @@ function FormFields({ form, onChange, showId }: {
   );
 }
 
-export default function Palette({ defs, placed, onDeleteDef, onEditDef, onAddDef }: Props) {
+export default function Palette({ defs, placed, selectedIds, onDeleteDef, onEditDef, onAddDef }: Props) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(blankForm(''));
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState<FormState>(blankForm(''));
+
+  const selectedDefIds = new Set(
+    placed.filter(p => selectedIds.has(p.instanceId)).map(p => p.defId)
+  );
 
   function handleDragStart(e: React.DragEvent, defId: string) {
     e.dataTransfer.setData('defId', defId);
@@ -151,11 +156,12 @@ export default function Palette({ defs, placed, onDeleteDef, onEditDef, onAddDef
         }
 
         const badSize = !hasValidSize(def);
+        const isSelected = selectedDefIds.has(def.id);
 
         return (
           <div
             key={def.id}
-            className={`palette-item${full ? ' fully-placed' : ''}${badSize ? ' palette-item-invalid' : ''}`}
+            className={`palette-item${full ? ' fully-placed' : ''}${badSize ? ' palette-item-invalid' : ''}${isSelected ? ' palette-item-selected' : ''}`}
             draggable={!full && !badSize}
             onDragStart={full || badSize ? undefined : e => handleDragStart(e, def.id)}
             style={{ position: 'relative', paddingRight: 40 }}

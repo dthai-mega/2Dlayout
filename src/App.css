@@ -74,6 +74,12 @@ html, body, #root {
   cursor: default;
 }
 
+.palette-item.palette-item-selected {
+  border-color: #3182ce;
+  background: #eaf3fc;
+  box-shadow: 0 0 0 1px #3182ce;
+}
+
 .palette-card-btn {
   background: #eee;
   border: 1px solid #bbb;
