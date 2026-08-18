@@ -7,19 +7,22 @@ interface Props {
   strokeUnit: number;
   onMouseDown: (e: React.MouseEvent, id: string) => void;
   onClick: (e: React.MouseEvent, id: string) => void;
+  onContextMenu: (e: React.MouseEvent, id: string) => void;
 }
 
-export default function Wireduct({ item, selected, textUnit, strokeUnit, onMouseDown, onClick }: Props) {
+export default function Wireduct({ item, selected, textUnit, strokeUnit, onMouseDown, onClick, onContextMenu }: Props) {
   const w = item.orientation === 'horizontal' ? item.length : item.ductWidth;
   const h = item.orientation === 'horizontal' ? item.ductWidth : item.length;
   const stroke = selected ? '#3182ce' : '#444';
+  const rotation = item.rotation ?? 0;
 
   return (
     <g
-      transform={`translate(${item.x}, ${item.y})`}
+      transform={`translate(${item.x}, ${item.y}) rotate(${rotation}, ${w / 2}, ${h / 2})`}
       style={{ cursor: 'move' }}
       onMouseDown={e => onMouseDown(e, item.id)}
       onClick={e => onClick(e, item.id)}
+      onContextMenu={e => onContextMenu(e, item.id)}
     >
       <rect
         width={w}

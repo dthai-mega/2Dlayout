@@ -5,6 +5,7 @@ import { saveLayout, loadLayout, loadCsvFile } from './utils/storage';
 import { screenToCanvas, zoomAll } from './utils/zoom';
 import { nextTag, nextTags, unusedTags } from './utils/tags';
 import { hasValidSize } from './utils/validate';
+import { rotatedBBox } from './utils/bbox';
 import type { ZoomItem } from './utils/zoom';
 import Toolbar from './components/Toolbar';
 import Palette from './components/Palette';
@@ -52,13 +53,17 @@ function containedIn(
 }
 
 function getPlacedBBox(p: PlacedComponent, def: ComponentDef) {
-  if (p.rotation === 0 || p.rotation === 180) {
-    return { x: p.x, y: p.y, w: def.width, h: def.height };
-  }
-  // 90 or 270: dimensions swap, position shifts to keep same visual center
-  const dx = (def.width - def.height) / 2;
-  const dy = (def.height - def.width) / 2;
-  return { x: p.x + dx, y: p.y + dy, w: def.height, h: def.width };
+  return rotatedBBox(p.x, p.y, def.width, def.height, p.rotation);
+}
+
+function getWireductBBox(w: Wireduct) {
+  const baseW = w.orientation === 'horizontal' ? w.length : w.ductWidth;
+  const baseH = w.orientation === 'horizontal' ? w.ductWidth : w.length;
+  return rotatedBBox(w.x, w.y, baseW, baseH, w.rotation ?? 0);
+}
+
+function getRectBBox(r: DrawnRect) {
+  return rotatedBBox(r.x, r.y, r.width, r.height, r.rotation ?? 0);
 }
 
 export default function App() {
@@ -93,6 +98,12 @@ export default function App() {
   const [tagEditState, setTagEditState] = useState<{
     instanceId: string; screenX: number; screenY: number; current: string; defId: string;
   } | null>(null);
+  const [shapeMenu, setShapeMenu] = useState<{ kind: 'rect' | 'wireduct'; id: string; x: number; y: number } | null>(null);
+  const [shapeEditState, setShapeEditState] = useState<
+    | { kind: 'rect'; id: string; screenX: number; screenY: number; width: number; height: number; rotation: number }
+    | { kind: 'wireduct'; id: string; screenX: number; screenY: number; length: number; ductWidth: number; rotation: number }
+    | null
+  >(null);
   const [csvRawText, setCsvRawText] = useState<string | null>(null);
 
   type LayoutSnap = { placed: PlacedComponent[]; wireducts: Wireduct[]; drawnRects: DrawnRect[]; textItems: TextItem[] };
@@ -151,6 +162,8 @@ export default function App() {
     setDropPending(null);
     setTextInputState(null);
     setTagEditState(null);
+    setShapeMenu(null);
+    setShapeEditState(null);
     if (dragState.current) {
       const ds = dragState.current;
       setPlaced(prev => prev.map(p => {
@@ -267,6 +280,31 @@ export default function App() {
     setContextMenu({ instanceId, x: e.clientX, y: e.clientY });
   }, []);
 
+  const handleRectContextMenu = useCallback((e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShapeMenu({ kind: 'rect', id, x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleWireductContextMenu = useCallback((e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShapeMenu({ kind: 'wireduct', id, x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleShapeEditSave = useCallback(() => {
+    if (!shapeEditState) return;
+    pushHistory();
+    if (shapeEditState.kind === 'rect') {
+      const { id, width, height, rotation } = shapeEditState;
+      setDrawnRects(prev => prev.map(r => r.id === id ? { ...r, width, height, rotation } : r));
+    } else {
+      const { id, length, ductWidth, rotation } = shapeEditState;
+      setWireducts(prev => prev.map(w => w.id === id ? { ...w, length, ductWidth, rotation } : w));
+    }
+    setShapeEditState(null);
+  }, [shapeEditState, pushHistory]);
+
   const handleTogglePN = useCallback((instanceId: string) => {
     setPlaced(prev => prev.map(p =>
       p.instanceId === instanceId ? { ...p, showPN: !p.showPN } : p
@@ -327,13 +365,8 @@ export default function App() {
         if (!def) return { x: p.x, y: p.y, w: 50, h: 50 };
         return getPlacedBBox(p, def);
       }),
-      ...wireducts.map(w => ({
-        x: w.x,
-        y: w.y,
-        w: w.orientation === 'horizontal' ? w.length : w.ductWidth,
-        h: w.orientation === 'horizontal' ? w.ductWidth : w.length,
-      })),
-      ...drawnRects.map(r => ({ x: r.x, y: r.y, w: r.width, h: r.height })),
+      ...wireducts.map(getWireductBBox),
+      ...drawnRects.map(getRectBBox),
       ...textItems.map(t => ({ x: t.x, y: t.y - t.fontSize, w: t.text.length * t.fontSize * 0.6, h: t.fontSize })),
     ];
 
@@ -479,12 +512,8 @@ export default function App() {
         if (!def) return { x: p.x, y: p.y, w: 50, h: 50 };
         return getPlacedBBox(p, def);
       }),
-      ...wireducts.map(w => ({
-        x: w.x, y: w.y,
-        w: w.orientation === 'horizontal' ? w.length : w.ductWidth,
-        h: w.orientation === 'horizontal' ? w.ductWidth : w.length,
-      })),
-      ...drawnRects.map(r => ({ x: r.x, y: r.y, w: r.width, h: r.height })),
+      ...wireducts.map(getWireductBBox),
+      ...drawnRects.map(getRectBBox),
       ...textItems.map(t => {
         const th = t.fontSize * textScale;
         return { x: t.x, y: t.y - th, w: t.text.length * th * 0.6, h: th };
@@ -770,12 +799,10 @@ export default function App() {
             if (def && containedIn(box, getPlacedBBox(p, def))) newIds.add(p.instanceId);
           }
           for (const w of wireducts) {
-            const ww = w.orientation === 'horizontal' ? w.length : w.ductWidth;
-            const wh = w.orientation === 'horizontal' ? w.ductWidth : w.length;
-            if (containedIn(box, { x: w.x, y: w.y, w: ww, h: wh })) newIds.add(w.id);
+            if (containedIn(box, getWireductBBox(w))) newIds.add(w.id);
           }
           for (const r of drawnRects) {
-            if (containedIn(box, { x: r.x, y: r.y, w: r.width, h: r.height })) newIds.add(r.id);
+            if (containedIn(box, getRectBBox(r))) newIds.add(r.id);
           }
           const tUnit = textScale / transform.scale;
           for (const t of textItems) {
@@ -906,8 +933,10 @@ export default function App() {
             onComponentContextMenu={handleComponentContextMenu}
             onWireductClick={handleWireductClick}
             onWireductMouseDown={handleWireductMouseDown}
+            onWireductContextMenu={handleWireductContextMenu}
             onRectClick={handleRectClick}
             onRectMouseDown={handleRectMouseDown}
+            onRectContextMenu={handleRectContextMenu}
             drawnRects={drawnRects}
             textItems={textItems}
             onTextClick={handleTextClick}
@@ -1065,6 +1094,109 @@ export default function App() {
             <datalist id="tag-options">
               {options.map(t => <option key={t} value={t} />)}
             </datalist>
+          </>
+        );
+      })()}
+      {shapeMenu && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => setShapeMenu(null)} />
+          <div style={{
+            position: 'fixed', left: shapeMenu.x, top: shapeMenu.y,
+            zIndex: 101, background: '#fff', border: '1px solid #ccc',
+            borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+            minWidth: 160,
+          }}>
+            <button
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 12px', border: 'none', background: 'none', cursor: 'pointer' }}
+              onClick={() => {
+                if (shapeMenu.kind === 'rect') {
+                  const r = drawnRects.find(x => x.id === shapeMenu.id);
+                  if (r) setShapeEditState({ kind: 'rect', id: r.id, screenX: shapeMenu.x, screenY: shapeMenu.y, width: r.width, height: r.height, rotation: r.rotation ?? 0 });
+                } else {
+                  const w = wireducts.find(x => x.id === shapeMenu.id);
+                  if (w) setShapeEditState({ kind: 'wireduct', id: w.id, screenX: shapeMenu.x, screenY: shapeMenu.y, length: w.length, ductWidth: w.ductWidth, rotation: w.rotation ?? 0 });
+                }
+                setShapeMenu(null);
+              }}
+            >
+              Edit size &amp; rotation
+            </button>
+          </div>
+        </>
+      )}
+      {shapeEditState && (() => {
+        const onKey = (e: React.KeyboardEvent) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') handleShapeEditSave();
+          if (e.key === 'Escape') setShapeEditState(null);
+        };
+        const valid = shapeEditState.kind === 'rect'
+          ? shapeEditState.width > 0 && shapeEditState.height > 0
+          : shapeEditState.length > 0 && shapeEditState.ductWidth > 0;
+        return (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => setShapeEditState(null)} />
+            <div style={{
+              position: 'fixed', left: shapeEditState.screenX, top: shapeEditState.screenY,
+              zIndex: 101, background: '#fff', border: '1px solid #3182ce', borderRadius: 4,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.18)', padding: 8,
+              display: 'flex', flexDirection: 'column', gap: 4, minWidth: 170,
+            }}>
+              {shapeEditState.kind === 'rect' ? (
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                    Width:
+                    <input
+                      autoFocus type="number" min={1} value={shapeEditState.width} style={{ width: 70, marginLeft: 'auto' }}
+                      onChange={e => setShapeEditState(prev => prev && prev.kind === 'rect' ? { ...prev, width: Number(e.target.value) } : prev)}
+                      onKeyDown={onKey}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                    Height:
+                    <input
+                      type="number" min={1} value={shapeEditState.height} style={{ width: 70, marginLeft: 'auto' }}
+                      onChange={e => setShapeEditState(prev => prev && prev.kind === 'rect' ? { ...prev, height: Number(e.target.value) } : prev)}
+                      onKeyDown={onKey}
+                    />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                    Length:
+                    <input
+                      autoFocus type="number" min={1} value={shapeEditState.length} style={{ width: 70, marginLeft: 'auto' }}
+                      onChange={e => setShapeEditState(prev => prev && prev.kind === 'wireduct' ? { ...prev, length: Number(e.target.value) } : prev)}
+                      onKeyDown={onKey}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                    Duct width:
+                    <input
+                      type="number" min={1} value={shapeEditState.ductWidth} style={{ width: 70, marginLeft: 'auto' }}
+                      onChange={e => setShapeEditState(prev => prev && prev.kind === 'wireduct' ? { ...prev, ductWidth: Number(e.target.value) } : prev)}
+                      onKeyDown={onKey}
+                    />
+                  </label>
+                </>
+              )}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                Rotation:
+                <select
+                  value={shapeEditState.rotation}
+                  style={{ marginLeft: 'auto' }}
+                  onChange={e => setShapeEditState(prev => prev ? { ...prev, rotation: Number(e.target.value) } : prev)}
+                  onKeyDown={onKey}
+                >
+                  {[0, 90, 180, 270].map(deg => <option key={deg} value={deg}>{deg}°</option>)}
+                </select>
+              </label>
+              <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                <button style={{ flex: 1 }} disabled={!valid} onClick={handleShapeEditSave}>Save</button>
+                <button style={{ flex: 1 }} onClick={() => setShapeEditState(null)}>Cancel</button>
+              </div>
+            </div>
           </>
         );
       })()}

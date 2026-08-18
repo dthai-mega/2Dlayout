@@ -26,6 +26,7 @@ export interface Wireduct {
   length: number;      // px along the long axis
   orientation: 'horizontal' | 'vertical';
   ductWidth: number;   // px — the short dimension
+  rotation?: number;   // degrees: 0 | 90 | 180 | 270, pivoted at center; default 0
 }
 
 export interface TextItem {
@@ -42,6 +43,7 @@ export interface DrawnRect {
   y: number;
   width: number;
   height: number;
+  rotation?: number;   // degrees: 0 | 90 | 180 | 270, pivoted at center; default 0
 }
 
 export interface Layout {

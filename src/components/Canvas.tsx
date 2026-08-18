@@ -30,8 +30,10 @@ interface Props {
   onComponentContextMenu: (e: React.MouseEvent, instanceId: string) => void;
   onWireductClick: (e: React.MouseEvent, id: string) => void;
   onWireductMouseDown: (e: React.MouseEvent, id: string) => void;
+  onWireductContextMenu: (e: React.MouseEvent, id: string) => void;
   onRectClick: (e: React.MouseEvent, id: string) => void;
   onRectMouseDown: (e: React.MouseEvent, id: string) => void;
+  onRectContextMenu: (e: React.MouseEvent, id: string) => void;
   onCanvasMouseDown: (e: React.MouseEvent) => void;
   onCanvasMouseMove: (e: React.MouseEvent) => void;
   onCanvasMouseUp: (e: React.MouseEvent) => void;
@@ -49,7 +51,9 @@ interface Props {
 const Canvas = forwardRef<CanvasHandle, Props>(({
   defs, placed, wireducts, gridSettings, transform, tool,
   selectedIds, overlappingIds, ductWidth: _ductWidth, textScale, lineScale, onTransformChange: _onTransformChange, onDrop,
-  onComponentMouseDown, onComponentClick, onComponentContextMenu, onWireductClick, onWireductMouseDown, onRectClick, onRectMouseDown,
+  onComponentMouseDown, onComponentClick, onComponentContextMenu,
+  onWireductClick, onWireductMouseDown, onWireductContextMenu,
+  onRectClick, onRectMouseDown, onRectContextMenu,
   onCanvasMouseDown, onCanvasMouseMove, onCanvasMouseUp, onWheel,
   wireductPreview, drawnRects, rectPreview, selectionBox, textItems, onTextClick, onTextMouseDown, onTextDblClick,
 }, ref) => {
@@ -129,6 +133,7 @@ const Canvas = forwardRef<CanvasHandle, Props>(({
             strokeUnit={strokeUnit}
             onMouseDown={onWireductMouseDown}
             onClick={onWireductClick}
+            onContextMenu={onWireductContextMenu}
           />
         ))}
 
@@ -140,6 +145,7 @@ const Canvas = forwardRef<CanvasHandle, Props>(({
             strokeUnit={strokeUnit}
             onMouseDown={() => {}}
             onClick={() => {}}
+            onContextMenu={() => {}}
           />
         )}
 
@@ -147,8 +153,18 @@ const Canvas = forwardRef<CanvasHandle, Props>(({
           const color = selectedIds.has(r.id) ? '#3182ce' : '#555';
           const fs = 11 * textUnit;
           const pad = 4 / scale;
+          const cx = r.x + r.width / 2;
+          const cy = r.y + r.height / 2;
+          const rotation = r.rotation ?? 0;
           return (
-            <g key={r.id} style={{ cursor: 'move' }} onMouseDown={e => onRectMouseDown(e, r.id)} onClick={e => onRectClick(e, r.id)}>
+            <g
+              key={r.id}
+              style={{ cursor: 'move' }}
+              transform={rotation ? `rotate(${rotation}, ${cx}, ${cy})` : undefined}
+              onMouseDown={e => onRectMouseDown(e, r.id)}
+              onClick={e => onRectClick(e, r.id)}
+              onContextMenu={e => onRectContextMenu(e, r.id)}
+            >
               <rect
                 x={r.x}
                 y={r.y}
@@ -160,7 +176,7 @@ const Canvas = forwardRef<CanvasHandle, Props>(({
                 strokeDasharray={`${6 / scale} ${3 / scale}`}
               />
               <text
-                x={r.x + r.width / 2}
+                x={cx}
                 y={r.y - pad}
                 textAnchor="middle"
                 dominantBaseline="auto"
@@ -172,12 +188,12 @@ const Canvas = forwardRef<CanvasHandle, Props>(({
               </text>
               <text
                 x={r.x + r.width + pad}
-                y={r.y + r.height / 2}
+                y={cy}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize={fs}
                 fill={color}
-                transform={`rotate(90, ${r.x + r.width + pad}, ${r.y + r.height / 2})`}
+                transform={`rotate(90, ${r.x + r.width + pad}, ${cy})`}
                 style={{ pointerEvents: 'none', userSelect: 'none' }}
               >
                 {Math.round(r.height)}
