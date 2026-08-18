@@ -2,11 +2,12 @@ import { useState } from 'react';
 import type { ComponentDef } from '../types';
 import { parseCsv, detectDelimiter } from '../utils/csv';
 import { hasValidSize } from '../utils/validate';
+import { applyCsvDefs, type CsvLoadMode } from '../utils/csvMerge';
 
 interface Props {
   rawText: string;
-  existingIds: string[];
-  onConfirm: (defs: ComponentDef[], append: boolean) => void;
+  existingDefs: ComponentDef[];
+  onConfirm: (finalDefs: ComponentDef[], mode: CsvLoadMode, csvIds: string[]) => void;
   onCancel: () => void;
 }
 
@@ -17,29 +18,34 @@ const DELIMITERS: { label: string; value: string }[] = [
   { label: 'Semicolon', value: ';' },
 ];
 
+const MODES: { label: string; value: CsvLoadMode }[] = [
+  { label: 'Replace project (clears all placed objects)', value: 'replace' },
+  { label: 'Append — overwrite matching IDs (clears their placed objects)', value: 'append-overwrite' },
+  { label: 'Append — keep existing on match', value: 'append-keep' },
+];
+
 const COLUMNS = ['ID', 'Tags', 'Part Number', 'Description', 'Width', 'Height', 'Depth', 'Qty'];
 
 function isRowValid(def: ComponentDef): boolean {
   return !!def.id && !!def.partNumber;
 }
 
-export default function CsvPreviewDialog({ rawText, existingIds, onConfirm, onCancel }: Props) {
+export default function CsvPreviewDialog({ rawText, existingDefs, onConfirm, onCancel }: Props) {
   const firstLine = rawText.split('\n')[0] ?? '';
   const [delimiter, setDelimiter] = useState('auto');
-  const [mode, setMode] = useState<'replace' | 'append'>('replace');
+  const [mode, setMode] = useState<CsvLoadMode>('replace');
 
   const effectiveDelimiter = delimiter === 'auto' ? detectDelimiter(firstLine) : delimiter;
   const defs = parseCsv(rawText, effectiveDelimiter);
   const validDefs = defs.filter(isRowValid);
-  const existingIdSet = new Set(existingIds);
-  const appendDefs = validDefs.filter(d => !existingIdSet.has(d.id));
-  const skippedCount = validDefs.length - appendDefs.length;
-  const applyDefs = mode === 'append' ? appendDefs : validDefs;
-  const validCount = applyDefs.length;
+  const existingIdSet = new Set(existingDefs.map(d => d.id));
+  const matchCount = validDefs.filter(d => existingIdSet.has(d.id)).length;
+  const finalDefs = applyCsvDefs(mode, existingDefs, validDefs);
+  const validCount = mode === 'append-keep' ? validDefs.length - matchCount : validDefs.length;
   const badSizeCount = defs.filter(d => !hasValidSize(d)).length;
 
   function handleConfirm() {
-    onConfirm(applyDefs, mode === 'append');
+    onConfirm(finalDefs, mode, validDefs.map(d => d.id));
   }
 
   return (
@@ -58,15 +64,17 @@ export default function CsvPreviewDialog({ rawText, existingIds, onConfirm, onCa
           </label>
           <label>
             Mode:
-            <select value={mode} onChange={e => setMode(e.target.value as 'replace' | 'append')}>
-              <option value="replace">Replace list</option>
-              <option value="append">Append (skip duplicates)</option>
+            <select value={mode} onChange={e => setMode(e.target.value as CsvLoadMode)}>
+              {MODES.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
             </select>
           </label>
           <span style={{ color: '#666', fontSize: 12 }}>
             {defs.length} row{defs.length !== 1 ? 's' : ''} found
             {defs.length - validDefs.length > 0 ? ` (${defs.length - validDefs.length} invalid)` : ''}
-            {mode === 'append' && skippedCount > 0 ? `, ${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''} skipped` : ''}
+            {mode === 'append-keep' && matchCount > 0 ? `, ${matchCount} duplicate${matchCount !== 1 ? 's' : ''} skipped` : ''}
+            {mode === 'append-overwrite' && matchCount > 0 ? `, ${matchCount} existing ID${matchCount !== 1 ? 's' : ''} will be overwritten` : ''}
             {badSizeCount > 0 ? `, ${badSizeCount} need W/H` : ''}
           </span>
         </div>
@@ -103,7 +111,7 @@ export default function CsvPreviewDialog({ rawText, existingIds, onConfirm, onCa
         <div className="dialog-actions">
           <button onClick={onCancel}>Cancel</button>
           <button onClick={handleConfirm} disabled={validCount === 0}>
-            {mode === 'append' ? 'Append' : 'Apply'} ({validCount} component{validCount !== 1 ? 's' : ''})
+            {mode === 'replace' ? 'Apply' : 'Append'} ({validCount} component{validCount !== 1 ? 's' : ''})
           </button>
         </div>
       </div>

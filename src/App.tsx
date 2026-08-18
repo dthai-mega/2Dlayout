@@ -955,12 +955,18 @@ export default function App() {
       {csvRawText !== null && (
         <CsvPreviewDialog
           rawText={csvRawText}
-          existingIds={componentDefs.map(d => d.id)}
-          onConfirm={(defs, append) => {
-            if (append) {
-              setComponentDefs(prev => [...prev, ...defs]);
-            } else {
-              setComponentDefs(defs);
+          existingDefs={componentDefs}
+          onConfirm={(finalDefs, mode, csvIds) => {
+            pushHistory();
+            setComponentDefs(finalDefs);
+            if (mode === 'replace') {
+              setPlaced([]);
+              setWireducts([]);
+              setDrawnRects([]);
+              setTextItems([]);
+            } else if (mode === 'append-overwrite') {
+              const overwritten = new Set(csvIds);
+              setPlaced(prev => prev.filter(p => !overwritten.has(p.defId)));
             }
             setCsvRawText(null);
           }}
