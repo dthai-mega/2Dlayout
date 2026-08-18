@@ -2,6 +2,7 @@ export interface ComponentDef {
   id: string;
   partNumber: string;
   description?: string;
+  tags?: string[]; // MARK column — ordered tag pool
   width: number;   // mm → canvas px (1:1)
   height: number;  // mm → canvas px (1:1)
   depth: number;   // mm, stored only
@@ -15,6 +16,7 @@ export interface PlacedComponent {
   y: number;
   rotation: number;    // degrees: 0 | 90 | 180 | 270
   showPN?: boolean;    // show part number label; default false
+  tag?: string;        // assigned from def.tags on placement; undefined = untagged
 }
 
 export interface Wireduct {

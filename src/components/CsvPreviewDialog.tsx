@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ComponentDef } from '../types';
 import { parseCsv, detectDelimiter } from '../utils/csv';
+import { hasValidSize } from '../utils/validate';
 
 interface Props {
   rawText: string;
@@ -16,17 +17,10 @@ const DELIMITERS: { label: string; value: string }[] = [
   { label: 'Semicolon', value: ';' },
 ];
 
-const COLUMNS = ['ID', 'Part Number', 'Description', 'Width', 'Height', 'Depth', 'Qty'];
+const COLUMNS = ['ID', 'Tags', 'Part Number', 'Description', 'Width', 'Height', 'Depth', 'Qty'];
 
 function isRowValid(def: ComponentDef): boolean {
-  return (
-    !!def.id &&
-    !!def.partNumber &&
-    !isNaN(def.width) &&
-    !isNaN(def.height) &&
-    !isNaN(def.depth) &&
-    !isNaN(def.qty)
-  );
+  return !!def.id && !!def.partNumber;
 }
 
 export default function CsvPreviewDialog({ rawText, existingIds, onConfirm, onCancel }: Props) {
@@ -42,6 +36,7 @@ export default function CsvPreviewDialog({ rawText, existingIds, onConfirm, onCa
   const skippedCount = validDefs.length - appendDefs.length;
   const applyDefs = mode === 'append' ? appendDefs : validDefs;
   const validCount = applyDefs.length;
+  const badSizeCount = defs.filter(d => !hasValidSize(d)).length;
 
   function handleConfirm() {
     onConfirm(applyDefs, mode === 'append');
@@ -72,6 +67,7 @@ export default function CsvPreviewDialog({ rawText, existingIds, onConfirm, onCa
             {defs.length} row{defs.length !== 1 ? 's' : ''} found
             {defs.length - validDefs.length > 0 ? ` (${defs.length - validDefs.length} invalid)` : ''}
             {mode === 'append' && skippedCount > 0 ? `, ${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''} skipped` : ''}
+            {badSizeCount > 0 ? `, ${badSizeCount} need W/H` : ''}
           </span>
         </div>
 
@@ -83,18 +79,19 @@ export default function CsvPreviewDialog({ rawText, existingIds, onConfirm, onCa
             <tbody>
               {defs.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: '#999' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', color: '#999' }}>
                     No data rows
                   </td>
                 </tr>
               )}
               {defs.map((def, i) => (
-                <tr key={i} className={isRowValid(def) ? '' : 'invalid'}>
+                <tr key={i} className={!isRowValid(def) ? 'invalid' : !hasValidSize(def) ? 'invalid-size' : ''}>
                   <td>{def.id || '—'}</td>
+                  <td>{def.tags?.join(', ') || '—'}</td>
                   <td>{def.partNumber || '—'}</td>
                   <td>{def.description || '—'}</td>
-                  <td>{isNaN(def.width) ? '?' : def.width}</td>
-                  <td>{isNaN(def.height) ? '?' : def.height}</td>
+                  <td>{isNaN(def.width) || def.width <= 0 ? '?' : def.width}</td>
+                  <td>{isNaN(def.height) || def.height <= 0 ? '?' : def.height}</td>
                   <td>{isNaN(def.depth) ? '?' : def.depth}</td>
                   <td>{isNaN(def.qty) ? '?' : def.qty}</td>
                 </tr>

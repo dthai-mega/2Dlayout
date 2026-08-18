@@ -31,30 +31,31 @@ export default function PlacedComponent({ item, def, selected, overlapping, text
         stroke={stroke}
         strokeWidth={strokeWidth}
       />
-      <text
-        x={def.width / 2}
-        y={item.showPN ? def.height / 2 - 6 * textUnit : def.height / 2}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontSize={11 * textUnit}
-        fill="#222"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {def.id}
-      </text>
-      {item.showPN && (
-        <text
-          x={def.width / 2}
-          y={def.height / 2 + 8 * textUnit}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontSize={10 * textUnit}
-          fill="#555"
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
-        >
-          {def.partNumber}
-        </text>
-      )}
+      {(() => {
+        const lines: { text: string; size: number; fill: string }[] = [
+          { text: def.id, size: 11, fill: '#222' },
+        ];
+        if (item.tag) lines.push({ text: item.tag, size: 10, fill: '#1a56a8' });
+        if (item.showPN) lines.push({ text: def.partNumber, size: 10, fill: '#555' });
+
+        const lineH = 12 * textUnit;
+        const top = def.height / 2 - ((lines.length - 1) * lineH) / 2;
+
+        return lines.map((l, i) => (
+          <text
+            key={i}
+            x={def.width / 2}
+            y={top + i * lineH}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={l.size * textUnit}
+            fill={l.fill}
+            style={{ pointerEvents: 'none', userSelect: 'none' }}
+          >
+            {l.text}
+          </text>
+        ));
+      })()}
     </g>
   );
 }

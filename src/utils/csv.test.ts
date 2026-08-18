@@ -65,10 +65,81 @@ describe('parseCsv', () => {
     expect(parseCsv('ID\tPN\tW\tH\tD\tQTY')).toHaveLength(0);
   });
 
-  it('uses column position not header names (col 3 = height)', () => {
+  it('maps columns by header name, not position', () => {
     const csv = 'ID\tPN\tW\tD\tH\tQTY\nX\tY\t10\t20\t30\t1';
     const defs = parseCsv(csv);
+    expect(defs[0].height).toBe(30);
+    expect(defs[0].depth).toBe(20);
+  });
+
+  it('parses a quoted field containing the delimiter', () => {
+    const csv = 'ID,MARK,PN,QTY,W,H,D\n2,"SCB2, SCB3",PN1,2,10,20,30';
+    const defs = parseCsv(csv);
+    expect(defs[0].tags).toEqual(['SCB2', 'SCB3']);
+    expect(defs[0].partNumber).toBe('PN1');
+  });
+
+  it('keeps QTY/W/H aligned past a quoted DESCRIPTION containing commas', () => {
+    const csv = 'ID,PN,DESCRIPTION,QTY,W,H,D\n1,PN1,"BREAKER, 230 VAC, 4A",2,10,20,30';
+    const defs = parseCsv(csv);
+    expect(defs[0].description).toBe('BREAKER, 230 VAC, 4A');
+    expect(defs[0].qty).toBe(2);
+    expect(defs[0].width).toBe(10);
     expect(defs[0].height).toBe(20);
-    expect(defs[0].depth).toBe(30);
+  });
+
+  it('unescapes "" inside a quoted field to a literal quote', () => {
+    const csv = 'ID,PN,DESCRIPTION,QTY,W,H,D\n1,PN1,"7"" SCREEN",1,10,20,30';
+    const defs = parseCsv(csv);
+    expect(defs[0].description).toBe('7" SCREEN');
+  });
+
+  it('parses CRLF input identically to LF', () => {
+    const csv = 'ID,PN,QTY,W,H,D\r\n1,PN1,1,10,20,30\r\n';
+    const defs = parseCsv(csv);
+    expect(defs).toHaveLength(1);
+    expect(defs[0].id).toBe('1');
+  });
+
+  it('strips a leading UTF-8 BOM', () => {
+    const csv = '﻿ID,PN,QTY,W,H,D\n1,PN1,1,10,20,30';
+    const defs = parseCsv(csv);
+    expect(defs[0].id).toBe('1');
+  });
+
+  it('backward compat: old 9-column header has no tags', () => {
+    const csv = 'ID,PN,MANUFACTURER,MANUFACTURER PART #,DESCRIPTION,QTY,W,H,D\n1,PN1,ABB,SU201,desc,1,10,20,30';
+    const defs = parseCsv(csv);
+    expect(defs[0].tags).toBeUndefined();
+  });
+
+  it('backward compat: oldest 6-column header has no tags', () => {
+    const csv = 'ID,PN,W,H,D,QTY\n1,PN1,10,20,30,1';
+    const defs = parseCsv(csv);
+    expect(defs[0].tags).toBeUndefined();
+  });
+
+  it('MARK column present but empty on a row gives tags undefined', () => {
+    const csv = 'ID,MARK,PN,QTY,W,H,D\n1,,PN1,1,10,20,30';
+    const defs = parseCsv(csv);
+    expect(defs[0].tags).toBeUndefined();
+  });
+
+  it('an explicit QTY of 0 stays 0, even with tags present', () => {
+    const csv = 'ID,MARK,PN,QTY,W,H,D\n1,"T1, T2",PN1,0,10,20,30';
+    const defs = parseCsv(csv);
+    expect(defs[0].qty).toBe(0);
+  });
+
+  it('a blank QTY stays 0', () => {
+    const csv = 'ID,PN,QTY,W,H,D\n1,PN1,,10,20,30';
+    const defs = parseCsv(csv);
+    expect(defs[0].qty).toBe(0);
+  });
+
+  it('non-numeric QTY falls back to the tag count', () => {
+    const csv = 'ID,MARK,PN,QTY,W,H,D\n1,"T1, T2",PN1,n/a,10,20,30';
+    const defs = parseCsv(csv);
+    expect(defs[0].qty).toBe(2);
   });
 });

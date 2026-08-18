@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import type { ComponentDef, PlacedComponent } from '../types';
+import { parseTags } from '../utils/csv';
+import { hasValidSize } from '../utils/validate';
+import { unusedTags } from '../utils/tags';
 
 interface Props {
   defs: ComponentDef[];
@@ -18,9 +21,9 @@ function nextAutoId(defs: ComponentDef[]): string {
   return nums.length > 0 ? String(Math.max(...nums) + 1) : '1';
 }
 
-type FormState = { id: string; partNumber: string; description: string; width: string; height: string; depth: string; qty: string };
+type FormState = { id: string; partNumber: string; description: string; tags: string; width: string; height: string; depth: string; qty: string };
 
-const blankForm = (id: string): FormState => ({ id, partNumber: '', description: '', width: '', height: '', depth: '', qty: '1' });
+const blankForm = (id: string): FormState => ({ id, partNumber: '', description: '', tags: '', width: '', height: '', depth: '', qty: '1' });
 
 function isFormValid(f: FormState, allowEditId = false): boolean {
   return (allowEditId || !!f.id.trim()) &&
@@ -63,6 +66,13 @@ function FormFields({ form, onChange, showId }: {
         onKeyDown={e => e.stopPropagation()}
         style={{ width: '100%', marginBottom: 3 }}
       />
+      <input
+        placeholder="Tags (comma separated)"
+        value={form.tags}
+        onChange={f('tags')}
+        onKeyDown={e => e.stopPropagation()}
+        style={{ width: '100%', marginBottom: 3 }}
+      />
       <div style={{ display: 'flex', gap: 3, marginBottom: 3 }}>
         <input type="number" placeholder="W" value={form.width} onChange={f('width')} onKeyDown={e => e.stopPropagation()} style={{ width: 0, flex: 1 }} />
         <input type="number" placeholder="H" value={form.height} onChange={f('height')} onKeyDown={e => e.stopPropagation()} style={{ width: 0, flex: 1 }} />
@@ -94,12 +104,13 @@ export default function Palette({ defs, placed, onDeleteDef, onEditDef, onAddDef
 
   function startEdit(def: ComponentDef) {
     setEditingId(def.id);
-    setEditForm({ id: def.id, partNumber: def.partNumber, description: def.description ?? '', width: String(def.width), height: String(def.height), depth: String(def.depth), qty: String(def.qty) });
+    setEditForm({ id: def.id, partNumber: def.partNumber, description: def.description ?? '', tags: (def.tags ?? []).join(', '), width: String(def.width), height: String(def.height), depth: String(def.depth), qty: String(def.qty) });
   }
 
   function submitEdit(id: string) {
     if (!isFormValid(editForm, true)) return;
-    onEditDef({ id, partNumber: editForm.partNumber.trim(), description: editForm.description.trim() || undefined, width: parseFloat(editForm.width), height: parseFloat(editForm.height), depth: parseFloat(editForm.depth), qty: parseInt(editForm.qty) });
+    const tags = parseTags(editForm.tags);
+    onEditDef({ id, partNumber: editForm.partNumber.trim(), description: editForm.description.trim() || undefined, tags: tags.length ? tags : undefined, width: parseFloat(editForm.width), height: parseFloat(editForm.height), depth: parseFloat(editForm.depth), qty: parseInt(editForm.qty) });
     setEditingId(null);
   }
 
@@ -111,7 +122,8 @@ export default function Palette({ defs, placed, onDeleteDef, onEditDef, onAddDef
   function submitAdd() {
     if (!isFormValid(addForm)) return;
     if (defs.some(d => d.id === addForm.id.trim())) return; // duplicate
-    onAddDef({ id: addForm.id.trim(), partNumber: addForm.partNumber.trim(), description: addForm.description.trim() || undefined, width: parseFloat(addForm.width), height: parseFloat(addForm.height), depth: parseFloat(addForm.depth), qty: parseInt(addForm.qty) });
+    const tags = parseTags(addForm.tags);
+    onAddDef({ id: addForm.id.trim(), partNumber: addForm.partNumber.trim(), description: addForm.description.trim() || undefined, tags: tags.length ? tags : undefined, width: parseFloat(addForm.width), height: parseFloat(addForm.height), depth: parseFloat(addForm.depth), qty: parseInt(addForm.qty) });
     setShowAddForm(false);
   }
 
@@ -138,18 +150,26 @@ export default function Palette({ defs, placed, onDeleteDef, onEditDef, onAddDef
           );
         }
 
+        const badSize = !hasValidSize(def);
+
         return (
           <div
             key={def.id}
-            className={`palette-item${full ? ' fully-placed' : ''}`}
-            draggable={!full}
-            onDragStart={full ? undefined : e => handleDragStart(e, def.id)}
+            className={`palette-item${full ? ' fully-placed' : ''}${badSize ? ' palette-item-invalid' : ''}`}
+            draggable={!full && !badSize}
+            onDragStart={full || badSize ? undefined : e => handleDragStart(e, def.id)}
             style={{ position: 'relative', paddingRight: 40 }}
           >
             <div className="palette-item-id">{def.id}</div>
             <div className="palette-item-pn">{def.partNumber}</div>
             {def.description && <div className="palette-item-desc">{def.description}</div>}
             <div className="palette-item-qty">{count}/{def.qty} placed</div>
+            {def.tags && (
+              <div className="palette-item-tags">
+                Tags: {def.tags.join(', ')} — {unusedTags(def, placed).length} free
+              </div>
+            )}
+            {badSize && <div className="palette-item-invalid-msg">Invalid size — set W and H</div>}
             <div style={{ position: 'absolute', top: 3, right: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <button
                 className="palette-card-btn"

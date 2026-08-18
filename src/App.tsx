@@ -3,6 +3,8 @@ import type { ComponentDef, PlacedComponent, Wireduct, DrawnRect, TextItem, Grid
 import { overlaps } from './utils/overlap';
 import { saveLayout, loadLayout, loadCsvFile } from './utils/storage';
 import { screenToCanvas, zoomAll } from './utils/zoom';
+import { nextTag, nextTags, unusedTags } from './utils/tags';
+import { hasValidSize } from './utils/validate';
 import type { ZoomItem } from './utils/zoom';
 import Toolbar from './components/Toolbar';
 import Palette from './components/Palette';
@@ -88,6 +90,9 @@ export default function App() {
 
   const [triggerZoomAll, setTriggerZoomAll] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ instanceId: string; x: number; y: number } | null>(null);
+  const [tagEditState, setTagEditState] = useState<{
+    instanceId: string; screenX: number; screenY: number; current: string; defId: string;
+  } | null>(null);
   const [csvRawText, setCsvRawText] = useState<string | null>(null);
 
   type LayoutSnap = { placed: PlacedComponent[]; wireducts: Wireduct[]; drawnRects: DrawnRect[]; textItems: TextItem[] };
@@ -145,6 +150,7 @@ export default function App() {
     }
     setDropPending(null);
     setTextInputState(null);
+    setTagEditState(null);
     if (dragState.current) {
       const ds = dragState.current;
       setPlaced(prev => prev.map(p => {
@@ -459,15 +465,6 @@ export default function App() {
       const text = await loadCsvFile();
       setCsvRawText(text);
     } catch { /* user cancelled */ }
-  }, []);
-
-  const handleDownloadCsvTemplate = useCallback(() => {
-    const csv = 'ID,PN,MANUFACTURER,MANUFACTURER PART #,DESCRIPTION,QTY,W,H,D\n';
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'template.csv'; a.click();
-    URL.revokeObjectURL(url);
   }, []);
 
   const buildExportSvgClone = useCallback(() => {
@@ -804,6 +801,7 @@ export default function App() {
   const handleDrop = useCallback((defId: string, canvasX: number, canvasY: number, screenX: number, screenY: number) => {
     const def = componentDefs.find(d => d.id === defId);
     if (!def) return;
+    if (!hasValidSize(def)) return;   // invalid W/H -> not placeable
     const alreadyPlaced = placed.filter(p => p.defId === defId).length;
     const remaining = def.qty - alreadyPlaced;
     if (remaining <= 0) return;
@@ -812,7 +810,10 @@ export default function App() {
       return;
     }
     pushHistory();
-    setPlaced(prev => [...prev, { instanceId: crypto.randomUUID(), defId, x: canvasX, y: canvasY, rotation: 0 }]);
+    setPlaced(prev => [...prev, {
+      instanceId: crypto.randomUUID(), defId, x: canvasX, y: canvasY, rotation: 0,
+      tag: nextTag(def, placed) || undefined,
+    }]);
   }, [componentDefs, placed, pushHistory]);
 
   const handlePlaceOne = useCallback(() => {
@@ -824,14 +825,16 @@ export default function App() {
       x: dropPending.canvasX,
       y: dropPending.canvasY,
       rotation: 0,
+      tag: nextTag(dropPending.def, placed) || undefined,
     }]);
     setDropPending(null);
-  }, [dropPending, pushHistory]);
+  }, [dropPending, placed, pushHistory]);
 
   const handlePlaceAll = useCallback(() => {
     if (!dropPending) return;
     pushHistory();
     const { defId, canvasX, canvasY, remaining, def } = dropPending;
+    const tags = nextTags(def, placed, remaining);
     setPlaced(prev => [
       ...prev,
       ...Array.from({ length: remaining }, (_, i) => ({
@@ -840,10 +843,11 @@ export default function App() {
         x: canvasX + i * (def.width + placeAllGap),
         y: canvasY,
         rotation: 0,
+        tag: tags[i] || undefined,
       })),
     ]);
     setDropPending(null);
-  }, [dropPending, placeAllGap, pushHistory]);
+  }, [dropPending, placed, placeAllGap, pushHistory]);
 
   return (
     <div className="app">
@@ -863,11 +867,16 @@ export default function App() {
         lineScale={lineScale}
         onLineScaleChange={setLineScale}
         onLoadCsv={handleLoadCsv}
-        onDownloadCsvTemplate={handleDownloadCsvTemplate}
         onExport={handleExport}
         onSaveJson={handleSaveJson}
         onLoadJson={handleLoadJson}
       />
+      <div className="instructions-bar">
+        <strong>New here?</strong>{' '}
+        Download <strong>Excel Template</strong> → fill in your components (direct copy/paste from Solidworks BOM) → Save As CSV →{' '}
+        <strong>Load CSV</strong> to import them.{' '}
+        Use <strong>Save JSON</strong> to save your current layout to a file, and <strong>Load JSON</strong> to reopen it later.
+      </div>
       <div className="main">
         <Palette
           defs={componentDefs}
@@ -1011,7 +1020,51 @@ export default function App() {
               >
                 {p.showPN ? 'Hide PN' : 'Show PN'}
               </button>
+              <button
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 12px', border: 'none', background: 'none', cursor: 'pointer' }}
+                onClick={() => {
+                  setTagEditState({
+                    instanceId: p.instanceId, defId: p.defId,
+                    screenX: contextMenu.x, screenY: contextMenu.y,
+                    current: p.tag ?? '',
+                  });
+                  setContextMenu(null);
+                }}
+              >
+                Edit tag
+              </button>
             </div>
+          </>
+        );
+      })()}
+      {tagEditState && (() => {
+        const def = componentDefs.find(d => d.id === tagEditState.defId);
+        const options = def ? unusedTags(def, placed) : [];
+        return (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => setTagEditState(null)} />
+            <input
+              autoFocus
+              list="tag-options"
+              defaultValue={tagEditState.current}
+              placeholder="Tag (blank = none)"
+              style={{ position: 'fixed', left: tagEditState.screenX, top: tagEditState.screenY, zIndex: 101, fontSize: 13, border: '1px solid #3182ce', outline: 'none', background: 'rgba(255,255,255,0.95)', padding: '2px 6px', minWidth: 120, borderRadius: 2 }}
+              onKeyDown={e => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  const val = (e.target as HTMLInputElement).value.trim();
+                  pushHistory();
+                  setPlaced(prev => prev.map(p =>
+                    p.instanceId === tagEditState.instanceId ? { ...p, tag: val || undefined } : p
+                  ));
+                  setTagEditState(null);
+                }
+                if (e.key === 'Escape') setTagEditState(null);
+              }}
+            />
+            <datalist id="tag-options">
+              {options.map(t => <option key={t} value={t} />)}
+            </datalist>
           </>
         );
       })()}

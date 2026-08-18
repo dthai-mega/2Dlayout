@@ -30,6 +30,20 @@ html, body, #root {
   background: #ccc;
 }
 
+.instructions-bar {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: #555;
+  background: #eef6ff;
+  border-bottom: 1px solid #ccc;
+}
+
+.instructions-bar strong {
+  color: #1a56a8;
+  font-weight: 600;
+}
+
 .main {
   display: flex;
   flex: 1;
@@ -92,6 +106,26 @@ html, body, #root {
 .palette-item-qty {
   font-size: 11px;
   color: #888;
+}
+
+.palette-item-tags {
+  font-size: 11px;
+  color: #666;
+}
+
+.palette-item-invalid {
+  border: 1px dashed #e53e3e;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.palette-item-invalid-msg {
+  font-size: 11px;
+  color: #e53e3e;
+}
+
+.csv-preview-table tr.invalid-size {
+  background: #fff8e1;
 }
 
 .canvas-container {

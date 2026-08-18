@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { GridSettings, Tool, ViewTransform } from '../types';
+import { EXCEL_TEMPLATE_URL } from '../constants';
 
 interface Props {
   gridSettings: GridSettings;
@@ -17,7 +18,6 @@ interface Props {
   lineScale: number;
   onLineScaleChange: (v: number) => void;
   onLoadCsv: () => void;
-  onDownloadCsvTemplate: () => void;
   onExport: (format: 'svg' | 'png' | 'jpg') => void;
   onSaveJson: () => void;
   onLoadJson: () => void;
@@ -29,7 +29,7 @@ export default function Toolbar({
   ductWidth, onDuctWidthChange,
   transform, onZoomAll, onZoomChange,
   textScale, onTextScaleChange, lineScale, onLineScaleChange,
-  onLoadCsv, onDownloadCsvTemplate, onExport, onSaveJson, onLoadJson,
+  onLoadCsv, onExport, onSaveJson, onLoadJson,
 }: Props) {
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -46,7 +46,14 @@ export default function Toolbar({
   return (
     <div className="toolbar">
       <button onClick={onLoadCsv}>Load CSV</button>
-      <button onClick={onDownloadCsvTemplate}>CSV Template</button>
+      <button onClick={() => {
+        const a = document.createElement('a');
+        a.href = EXCEL_TEMPLATE_URL;
+        a.rel = 'noopener,noreferrer';
+        a.click();
+      }}>
+        Excel Template
+      </button>
       <div ref={exportRef} style={{ position: 'relative', display: 'inline-block' }}>
         <button onClick={() => setExportOpen(v => !v)}>Export ▾</button>
         {exportOpen && (
